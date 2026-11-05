@@ -1,0 +1,59 @@
+# Runs every day: collects products, updates trends, rebuilds and publishes the site.
+name: Daily update
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # 05:17 South Africa time
+  workflow_dispatch:       # adds a "Run workflow" button for manual runs
+
+permissions:
+  contents: write   # saves the product history database back to the repo
+  pages: write
+  id-token: write
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Collect products and build site
+        env:
+          ALIEXPRESS_APP_KEY: ${{ secrets.ALIEXPRESS_APP_KEY }}
+          ALIEXPRESS_APP_SECRET: ${{ secrets.ALIEXPRESS_APP_SECRET }}
+          ALIEXPRESS_TRACKING_ID: ${{ secrets.ALIEXPRESS_TRACKING_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AMAZON_TAG: ${{ vars.AMAZON_TAG }}
+          CONTACT_EMAIL: ${{ vars.CONTACT_EMAIL }}
+          CONTACT_FORM_URL: ${{ vars.CONTACT_FORM_URL }}
+          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_NAME: ${{ vars.SITE_NAME }}
+        run: python run.py
+
+      - name: Save price and order history
+        run: |
+          git config user.name "daily-bot"
+          git config user.email "daily-bot@users.noreply.github.com"
+          git add data/tankfinds.db
+          git commit -m "Daily data update" || echo "No changes"
+          git push
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
