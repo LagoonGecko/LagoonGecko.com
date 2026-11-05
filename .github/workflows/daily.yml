@@ -30,6 +30,14 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Put images in assets/img (in case they were uploaded to assets/)
+        run: |
+          mkdir -p assets/img
+          for f in assets/*.jpg assets/*.webp assets/*.png assets/*.svg; do
+            [ -e "$f" ] && mv "$f" assets/img/
+          done
+          ls assets/img
+
       - name: Collect products and build site
         env:
           ALIEXPRESS_APP_KEY: ${{ secrets.ALIEXPRESS_APP_KEY }}
